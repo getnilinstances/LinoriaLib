@@ -150,41 +150,45 @@ local ThemeManager = {} do
     end
 
     function ThemeManager:ApplyTheme(theme)
-        local customThemeData = self:GetCustomTheme(theme)
-        local data = customThemeData or self.BuiltInThemes[theme]
-        if not data then return end
+    local customThemeData = self:GetCustomTheme(theme)
+    local data = customThemeData or self.BuiltInThemes[theme]
 
-        if self.Library.InnerVideoBackground ~= nil then
-            self.Library.InnerVideoBackground.Visible = false
-        end
+    if not data then return end
 
-        -- Built-in themes are { index, dict }; custom themes are plain dicts
-        local scheme = (type(data) == "table" and data[2]) or data
+    if self.Library.InnerVideoBackground ~= nil then
+        self.Library.InnerVideoBackground.Visible = false
+    end
 
-        -- Only touch real theme fields; anything else (ItemType, SwordMaterial, ...)
-        -- must not be treated as a Color3.fromHex() argument.
-        for _, idx in next, ThemeFields do
-            local col = scheme[idx]
-            if col == nil then continue end
+    local scheme = (type(data) == "table" and data[2]) or data
 
-            if idx == "VideoLink" then
-                self.Library[idx] = col
+    local validColorFields = {
+        FontColor = true,
+        MainColor = true,
+        AccentColor = true,
+        BackgroundColor = true,
+        OutlineColor = true,
+    }
+
+    for idx, col in next, scheme do
+        if idx == "VideoLink" then
+            self.Library[idx] = col
+            if self.Library.Options[idx] then
+                pcall(function() self.Library.Options[idx]:SetValue(col) end)
+            end
+            if ApplyBackgroundVideo then ApplyBackgroundVideo(col) end
+        elseif validColorFields[idx] and type(col) == "string" and #col >= 6 then
+            local success, parsedColor = pcall(Color3.fromHex, col)
+            if success and parsedColor then
+                self.Library[idx] = parsedColor
                 if self.Library.Options[idx] then
-                    self.Library.Options[idx]:SetValue(col)
-                end
-                ApplyBackgroundVideo(col)
-            else
-                local ok, color = pcall(Color3.fromHex, col)
-                if not ok or not color then continue end
-                self.Library[idx] = color
-                if self.Library.Options[idx] then
-                    self.Library.Options[idx]:SetValueRGB(color)
+                    pcall(function() self.Library.Options[idx]:SetValueRGB(parsedColor) end)
                 end
             end
         end
-
-        self:ThemeUpdate()
     end
+
+    self:ThemeUpdate()
+                    end
 
     function ThemeManager:ThemeUpdate()
         if self.Library.InnerVideoBackground ~= nil then
